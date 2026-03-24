@@ -1,12 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "../supabase";
 
 const SAMMER_ORANGE = "#E8610A";
-
-const ticketIniziali = [
-  { id: "TK-042", nome: "Mario Rossi", categoria: "Dispositivo non si accende", descrizione: "Non si accende dopo aggiornamento firmware.", stato: "aperto", ora: "10:01", allegati: 2 },
-  { id: "TK-041", nome: "Giulia Bianchi", categoria: "Schermo danneggiato", descrizione: "Righe verticali dopo caduta.", stato: "in lavorazione", ora: "ieri", allegati: 1 },
-  { id: "TK-040", nome: "Luca Verdi", categoria: "Batteria / autonomia", descrizione: "Si scarica in 2 ore invece di 8.", stato: "risolto", ora: "2 giorni fa", allegati: 0 },
-];
 
 const coloreStato = {
   aperto: { background: "#FEF3C7", color: "#92400E" },
@@ -15,11 +10,32 @@ const coloreStato = {
 };
 
 export default function PannelloAdmin() {
-  const [tickets, setTickets] = useState(ticketIniziali);
-  const [selezionato, setSelezionato] = useState(ticketIniziali[0]);
+  const [tickets, setTickets] = useState([]);
+  const [selezionato, setSelezionato] = useState(null);
   const [risposta, setRisposta] = useState("");
-  const [nuovoStato, setNuovoStato] = useState(ticketIniziali[0].stato);
+  const [nuovoStato, setNuovoStato] = useState("aperto");
   const [inviato, setInviato] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    caricaTickets();
+    const subscription = supabase
+      .channel("tickets")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tickets" }, () => {
+        caricaTickets();
+      })
+      .subscribe();
+    return () => supabase.removeChannel(subscription);
+  }, []);
+
+  async function caricaTickets() {
+    const { data } = await supabase
+      .from("tickets")
+      .select("*")
+      .order("creato_at", { ascending: false });
+    if (data) setTickets(data);
+    setLoading(false);
+  }
 
   function seleziona(t) {
     setSelezionato(t);
@@ -28,15 +44,25 @@ export default function PannelloAdmin() {
     setInviato(false);
   }
 
-  function inviaRisposta() {
-    if (!risposta.trim()) return;
-    setTickets((prev) =>
-      prev.map((t) => t.id === selezionato.id ? { ...t, stato: nuovoStato } : t)
-    );
-    setSelezionato((prev) => ({ ...prev, stato: nuovoStato }));
-    setInviato(true);
-    setRisposta("");
-    setTimeout(() => setInviato(false), 3000);
+  async function inviaRisposta() {
+    if (!risposta.trim() || !selezionato) return;
+    const { error } = await supabase
+      .from("tickets")
+      .update({ stato: nuovoStato })
+      .eq("id", selezionato.id);
+    if (!error) {
+      setInviato(true);
+      setRisposta("");
+      setSelezionato((prev) => ({ ...prev, stato: nuovoStato }));
+      caricaTickets();
+      setTimeout(() => setInviato(false), 3000);
+    }
+  }
+
+  function formatData(iso) {
+    const d = new Date(iso);
+    return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "2-digit" })
+      + " " + d.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
   }
 
   return (
@@ -44,27 +70,34 @@ export default function PannelloAdmin() {
       <div style={styles.header}>
         <span style={styles.logoText}>SAMMER</span>
         <span style={styles.badge}>Pannello operatore</span>
+        <span style={styles.counter}>{tickets.length} ticket totali</span>
       </div>
       <div style={styles.body}>
         <div style={styles.lista}>
-          <div style={styles.listaHeader}>Ticket aperti</div>
+          <div style={styles.listaHeader}>Ticket</div>
+          {loading && <div style={styles.loading}>Caricamento...</div>}
+          {!loading && tickets.length === 0 && (
+            <div style={styles.loading}>Nessun ticket ancora.</div>
+          )}
           {tickets.map((t) => (
             <div key={t.id} style={{ ...styles.ticketItem, ...(selezionato?.id === t.id ? styles.ticketAttivo : {}) }} onClick={() => seleziona(t)}>
               <div style={styles.ticketTop}>
-                <span style={styles.ticketTitolo}>#{t.id}</span>
+                <span style={styles.ticketTitolo}>#{t.numero}</span>
                 <span style={{ ...styles.statoBadge, ...coloreStato[t.stato] }}>{t.stato}</span>
               </div>
-              <div style={styles.ticketNome}>{t.nome}</div>
+              <div style={styles.ticketNome}>{t.nome_cliente}</div>
               <div style={styles.ticketPreview}>{t.descrizione}</div>
-              <div style={styles.ticketMeta}>{t.ora}{t.allegati > 0 ? ` · ${t.allegati} allegati` : ""}</div>
+              <div style={styles.ticketMeta}>{formatData(t.creato_at)}</div>
             </div>
           ))}
         </div>
-        {selezionato && (
+        {selezionato ? (
           <div style={styles.dettaglio}>
-            <div style={styles.dettaglioTitolo}>#{selezionato.id} — {selezionato.nome}</div>
+            <div style={styles.dettaglioTitolo}>#{selezionato.numero} — {selezionato.nome_cliente}</div>
+            <div style={styles.dettaglioEmail}>{selezionato.email}</div>
             <div style={styles.dettaglioCategoria}>{selezionato.categoria}</div>
             <div style={styles.dettaglioDesc}>{selezionato.descrizione}</div>
+            <div style={styles.dettaglioData}>Ricevuto il {formatData(selezionato.creato_at)}</div>
             <div style={styles.aiBox}>
               <div style={styles.aiLabel}>Suggerimento AI</div>
               Problema comune post-aggiornamento. Suggerisci: hard reset (power + volume giù per 10s). Se non risolve, potrebbe essere necessario un reflash del firmware.
@@ -84,8 +117,10 @@ export default function PannelloAdmin() {
               </div>
               <button style={styles.btn} onClick={inviaRisposta}>Invia risposta</button>
             </div>
-            {inviato && <div style={styles.successMsg}>Risposta inviata. Notifica email spedita al cliente.</div>}
+            {inviato && <div style={styles.successMsg}>Stato aggiornato. Notifica inviata al cliente.</div>}
           </div>
+        ) : (
+          <div style={styles.vuoto}>Seleziona un ticket dalla lista</div>
         )}
       </div>
     </div>
@@ -97,9 +132,11 @@ const styles = {
   header: { padding: "12px 16px", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", gap: 10, background: "#fff" },
   logoText: { fontSize: 15, fontWeight: 700, letterSpacing: "0.08em", color: "#1a1a1a" },
   badge: { fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "#FEF3C7", color: "#92400E", fontWeight: 500 },
+  counter: { marginLeft: "auto", fontSize: 12, color: "#888" },
   body: { display: "grid", gridTemplateColumns: "260px 1fr", minHeight: 500 },
-  lista: { borderRight: "1px solid #eee", background: "#fafafa" },
+  lista: { borderRight: "1px solid #eee", background: "#fafafa", overflowY: "auto" },
   listaHeader: { padding: "10px 14px", fontSize: 12, fontWeight: 600, color: "#888", borderBottom: "1px solid #eee", textTransform: "uppercase", letterSpacing: "0.05em" },
+  loading: { padding: "20px 14px", fontSize: 13, color: "#aaa" },
   ticketItem: { padding: "12px 14px", borderBottom: "1px solid #f0f0f0", cursor: "pointer" },
   ticketAttivo: { background: "#FDF0E6", borderLeft: "3px solid #E8610A" },
   ticketTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 },
@@ -108,10 +145,12 @@ const styles = {
   ticketNome: { fontSize: 12, fontWeight: 500, color: "#444", marginBottom: 2 },
   ticketPreview: { fontSize: 11, color: "#888", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", marginBottom: 3 },
   ticketMeta: { fontSize: 10, color: "#bbb" },
-  dettaglio: { padding: "20px", display: "flex", flexDirection: "column", gap: 14, background: "#fff" },
+  dettaglio: { padding: "20px", display: "flex", flexDirection: "column", gap: 12, background: "#fff", overflowY: "auto" },
   dettaglioTitolo: { fontSize: 15, fontWeight: 700, color: "#1a1a1a" },
+  dettaglioEmail: { fontSize: 12, color: "#888" },
   dettaglioCategoria: { fontSize: 12, color: "#E8610A", fontWeight: 500 },
   dettaglioDesc: { fontSize: 13, color: "#555", lineHeight: 1.6 },
+  dettaglioData: { fontSize: 11, color: "#bbb" },
   aiBox: { background: "#FDF0E6", border: "1px solid #F4A35A", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "#7A2E00", lineHeight: 1.6 },
   aiLabel: { fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, color: "#E8610A" },
   field: { display: "flex", flexDirection: "column", gap: 4 },
@@ -120,4 +159,5 @@ const styles = {
   azioniRow: { display: "flex", alignItems: "flex-end", gap: 10 },
   btn: { padding: "9px 18px", borderRadius: 8, border: "none", background: "#E8610A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
   successMsg: { fontSize: 12, color: "#166534", background: "#DCFCE7", padding: "8px 12px", borderRadius: 8 },
+  vuoto: { display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: 13, background: "#fff" },
 };
