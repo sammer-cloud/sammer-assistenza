@@ -1,38 +1,52 @@
 import { useState, useEffect, useRef } from "react";
+import { supabase } from "../supabase";
 
 const SAMMER_ORANGE = "#E8610A";
+const TICKET_ID_DEMO = "00000000-0000-0000-0000-000000000001";
 
-const risposteAuto = [
-  "Grazie per il messaggio. Un operatore ti risponderà a breve.",
-  "Ho preso nota del tuo problema. Stiamo verificando la situazione.",
-  "Puoi inviarci anche una foto del dispositivo per velocizzare l'assistenza?",
-];
-
-export default function Chat({ nomeCliente = "Cliente" }) {
-  const [messaggi, setMessaggi] = useState([
-    { id: 1, testo: "Benvenuto all'assistenza Sammer. Come posso aiutarti?", mittente: "operatore", ora: oraNow() },
-    { id: 2, testo: "Ho analizzato il tuo ticket: prova un hard reset tenendo premuto power + volume giù per 10 secondi.", mittente: "ai", ora: oraNow() },
-  ]);
+export default function Chat({ ticketId = TICKET_ID_DEMO, nomeCliente = "Cliente" }) {
+  const [messaggi, setMessaggi] = useState([]);
   const [testo, setTesto] = useState("");
+  const [loading, setLoading] = useState(true);
   const bottomRef = useRef(null);
+
+  useEffect(() => {
+    caricaMessaggi();
+    const subscription = supabase
+      .channel("messaggi-" + ticketId)
+      .on("postgres_changes", {
+        event: "INSERT",
+        schema: "public",
+        table: "messaggi",
+        filter: "ticket_id=eq." + ticketId,
+      }, (payload) => {
+        setMessaggi((prev) => [...prev, payload.new]);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(subscription);
+  }, [ticketId]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messaggi]);
 
-  function oraNow() {
-    const t = new Date();
-    return t.getHours() + ":" + String(t.getMinutes()).padStart(2, "0");
+  async function caricaMessaggi() {
+    const { data } = await supabase
+      .from("messaggi")
+      .select("*")
+      .eq("ticket_id", ticketId)
+      .order("creato_at", { ascending: true });
+    if (data) setMessaggi(data);
+    setLoading(false);
   }
 
-  function invia() {
+  async function invia() {
     if (!testo.trim()) return;
-    const nuovoMsg = { id: Date.now(), testo: testo.trim(), mittente: "cliente", ora: oraNow() };
-    setMessaggi((prev) => [...prev, nuovoMsg]);
+    const msg = testo.trim();
     setTesto("");
-    setTimeout(() => {
-      const risposta = risposteAuto[Math.floor(Math.random() * risposteAuto.length)];
-      setMessaggi((prev) => [...prev, { id: Date.now() + 1, testo: risposta, mittente: "operatore", ora: oraNow() }]);
+    await supabase.from("messaggi").insert([{ ticket_id: ticketId, testo: msg, mittente: "cliente" }]);
+    setTimeout(async () => {
+      await supabase.from("messaggi").insert([{ ticket_id: ticketId, testo: "Grazie per il messaggio. Un operatore ti risponderà a breve.", mittente: "operatore" }]);
     }, 1000);
   }
 
@@ -53,15 +67,15 @@ export default function Chat({ nomeCliente = "Cliente" }) {
         </div>
       </div>
       <div style={styles.chatArea}>
+        {loading && <div style={styles.loading}>Caricamento messaggi...</div>}
+        {!loading && messaggi.length === 0 && <div style={styles.loading}>Nessun messaggio ancora. Scrivi per iniziare!</div>}
         {messaggi.map((m) => (
           <div key={m.id} style={{ display: "flex", flexDirection: "column", alignItems: m.mittente === "cliente" ? "flex-end" : "flex-start" }}>
             <div style={{ ...styles.bubble, ...(m.mittente === "cliente" ? styles.bubbleCliente : {}), ...(m.mittente === "operatore" ? styles.bubbleOperatore : {}), ...(m.mittente === "ai" ? styles.bubbleAI : {}) }}>
               {m.mittente === "ai" && <div style={styles.aiLabel}>Suggerimento AI</div>}
               {m.testo}
             </div>
-            <span style={styles.ora}>
-              {m.mittente === "cliente" ? nomeCliente : m.mittente === "ai" ? "Assistente" : "Operatore"} · {m.ora}
-            </span>
+            <span style={styles.ora}>{m.mittente === "cliente" ? nomeCliente : m.mittente === "ai" ? "Assistente" : "Operatore"}</span>
           </div>
         ))}
         <div ref={bottomRef} />
@@ -75,14 +89,15 @@ export default function Chat({ nomeCliente = "Cliente" }) {
 }
 
 const styles = {
-  container: { maxWidth: 480, margin: "0 auto", fontFamily: "system-ui, sans-serif", display: "flex", flexDirection: "column", height: 580, border: "1px solid #eee", borderRadius: 12, overflow: "hidden" },
+  container: { maxWidth: 480, margin: "0 auto", fontFamily: "system-ui, sans-serif", display: "flex", flexDirection: "column", height: 520, border: "1px solid #eee", borderRadius: 12, overflow: "hidden" },
   header: { padding: "12px 16px", borderBottom: "1px solid #eee", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fff" },
   logoText: { fontSize: 15, fontWeight: 700, letterSpacing: "0.08em", color: "#1a1a1a", marginRight: 8 },
   badge: { fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "#FDF0E6", color: "#7A2E00", fontWeight: 500 },
   onlineDot: { display: "flex", alignItems: "center", gap: 5 },
   dot: { width: 8, height: 8, borderRadius: "50%", background: "#22c55e", display: "inline-block" },
   onlineText: { fontSize: 12, color: "#555" },
-  chatArea: { flex: 1, overflowY: "auto", padding: "14px 14px", display: "flex", flexDirection: "column", gap: 10, background: "#fafafa" },
+  chatArea: { flex: 1, overflowY: "auto", padding: "14px", display: "flex", flexDirection: "column", gap: 10, background: "#fafafa" },
+  loading: { fontSize: 13, color: "#aaa", textAlign: "center", padding: "20px 0" },
   bubble: { maxWidth: "80%", padding: "9px 12px", borderRadius: 10, fontSize: 13, lineHeight: 1.5 },
   bubbleCliente: { background: "#E8610A", color: "#fff" },
   bubbleOperatore: { background: "#fff", color: "#1a1a1a", border: "1px solid #eee" },
