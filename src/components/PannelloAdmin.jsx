@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabase";
+import Chat from "./Chat";
 
 const SAMMER_ORANGE = "#E8610A";
 
@@ -148,6 +149,14 @@ export default function PannelloAdmin() {
             {inviato && (
               <div style={styles.successMsg}>Stato aggiornato. Notifica inviata al cliente.</div>
             )}
+            {/* Chat del ticket */}
+<div style={{ marginTop: 8 }}>
+  <div style={{ fontSize: 12, fontWeight: 500, color: "#777", marginBottom: 8 }}>
+    Chat con il cliente
+  </div>
+  <Chat ticketId={selezionato.id} nomeCliente={selezionato.nome_cliente} />
+</div>
+
           </div>
         ) : (
           <div style={styles.vuoto}>Seleziona un ticket dalla lista</div>
