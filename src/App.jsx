@@ -8,6 +8,7 @@ import Login from "./components/Login";
 export default function App() {
   const [utente, setUtente] = useState(null);
   const [vista, setVista] = useState("cliente");
+  const [ticketAperto, setTicketAperto] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -40,8 +41,23 @@ export default function App() {
           Area operatori
         </button>
       </div>
-      <NuovoTicket />
-      <Chat />
+
+      {!ticketAperto ? (
+        <NuovoTicket onInviato={(ticket) => setTicketAperto(ticket)} />
+      ) : (
+        <div style={{ maxWidth: 480, margin: "0 auto", display: "flex", flexDirection: "column", gap: 16 }}>
+          <div style={{ background: "#DCFCE7", border: "1px solid #86EFAC", borderRadius: 8, padding: "12px 16px", fontSize: 13, color: "#166534" }}>
+            Ticket #{ticketAperto.numero} aperto — puoi continuare a scrivere qui sotto
+          </div>
+          <Chat ticketId={ticketAperto.id} nomeCliente={ticketAperto.nome_cliente} />
+          <button
+            onClick={() => setTicketAperto(null)}
+            style={{ fontSize: 12, color: "#888", background: "none", border: "none", cursor: "pointer", textDecoration: "underline" }}
+          >
+            Apri un nuovo ticket
+          </button>
+        </div>
+      )}
     </div>
   );
 }
