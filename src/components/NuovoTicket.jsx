@@ -26,30 +26,40 @@ export default function NuovoTicket({ onInviato }) {
     setFiles((prev) => [...prev, ...nuovi].slice(0, 3));
   }
 
-  async function handleInvia() {
-    if (!descrizione || !email || !nome) {
-      setErrore("Compila tutti i campi obbligatori.");
-      return;
-    }
-    setLoading(true);
-    setErrore("");
-
-    const { data, error } = await supabase
-      .from("tickets")
-      .insert([{ nome_cliente: nome, email, categoria, descrizione, stato: "aperto" }])
-      .select()
-      .single();
-
-    if (error) {
-      setErrore("Errore durante l'invio. Riprova.");
-      setLoading(false);
-      return;
-    }
-
-    setInviato(true);
-    setLoading(false);
-    if (onInviato) onInviato(data);
+   async function handleInvia() {
+  if (!descrizione || !email || !nome) {
+    setErrore("Compila tutti i campi obbligatori.");
+    return;
   }
+  setLoading(true);
+  setErrore("");
+
+  // 1. Crea il ticket nel database
+  const { data: ticket, error: ticketError } = await supabase
+    .from("tickets")
+    .insert([{ nome_cliente: nome, email, categoria, descrizione, stato: "aperto" }])
+    .select()
+    .single();
+
+  if (ticketError) {
+    setErrore("Errore durante l'invio. Riprova.");
+    setLoading(false);
+    return;
+  }
+
+  // 2. Carica i file allegati su Storage
+  for (const file of files) {
+  const estensione = file.name.split(".").pop();
+  const percorso = `${ticket.id}/${Date.now()}.${estensione}`;
+  const { data: uploadData, error: uploadError } = await supabase.storage
+    .from("allegati")
+    .upload(percorso, file);
+}
+
+  setInviato(true);
+  setLoading(false);
+  if (onInviato) onInviato(ticket);
+}
 
   if (inviato) {
     return (
