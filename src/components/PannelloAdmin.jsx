@@ -19,12 +19,14 @@ export default function PannelloAdmin() {
 
   useEffect(() => {
     caricaTickets();
+
     const subscription = supabase
       .channel("tickets")
       .on("postgres_changes", { event: "*", schema: "public", table: "tickets" }, () => {
         caricaTickets();
       })
       .subscribe();
+
     return () => supabase.removeChannel(subscription);
   }, []);
 
@@ -46,10 +48,12 @@ export default function PannelloAdmin() {
 
   async function inviaRisposta() {
     if (!risposta.trim() || !selezionato) return;
+
     const { error } = await supabase
       .from("tickets")
       .update({ stato: nuovoStato })
       .eq("id", selezionato.id);
+
     if (!error) {
       setInviato(true);
       setRisposta("");
@@ -67,12 +71,16 @@ export default function PannelloAdmin() {
 
   return (
     <div style={styles.container}>
+
       <div style={styles.header}>
         <span style={styles.logoText}>SAMMER</span>
         <span style={styles.badge}>Pannello operatore</span>
         <span style={styles.counter}>{tickets.length} ticket totali</span>
       </div>
+
       <div style={styles.body}>
+
+        {/* Lista ticket */}
         <div style={styles.lista}>
           <div style={styles.listaHeader}>Ticket</div>
           {loading && <div style={styles.loading}>Caricamento...</div>}
@@ -80,7 +88,11 @@ export default function PannelloAdmin() {
             <div style={styles.loading}>Nessun ticket ancora.</div>
           )}
           {tickets.map((t) => (
-            <div key={t.id} style={{ ...styles.ticketItem, ...(selezionato?.id === t.id ? styles.ticketAttivo : {}) }} onClick={() => seleziona(t)}>
+            <div
+              key={t.id}
+              style={{ ...styles.ticketItem, ...(selezionato?.id === t.id ? styles.ticketAttivo : {}) }}
+              onClick={() => seleziona(t)}
+            >
               <div style={styles.ticketTop}>
                 <span style={styles.ticketTitolo}>#{t.numero}</span>
                 <span style={{ ...styles.statoBadge, ...coloreStato[t.stato] }}>{t.stato}</span>
@@ -91,6 +103,8 @@ export default function PannelloAdmin() {
             </div>
           ))}
         </div>
+
+        {/* Dettaglio */}
         {selezionato ? (
           <div style={styles.dettaglio}>
             <div style={styles.dettaglioTitolo}>#{selezionato.numero} — {selezionato.nome_cliente}</div>
@@ -98,18 +112,31 @@ export default function PannelloAdmin() {
             <div style={styles.dettaglioCategoria}>{selezionato.categoria}</div>
             <div style={styles.dettaglioDesc}>{selezionato.descrizione}</div>
             <div style={styles.dettaglioData}>Ricevuto il {formatData(selezionato.creato_at)}</div>
+
             <div style={styles.aiBox}>
               <div style={styles.aiLabel}>Suggerimento AI</div>
               Problema comune post-aggiornamento. Suggerisci: hard reset (power + volume giù per 10s). Se non risolve, potrebbe essere necessario un reflash del firmware.
             </div>
+
             <div style={styles.field}>
               <label style={styles.label}>Risposta al cliente</label>
-              <textarea style={styles.input} rows={3} placeholder="Scrivi la risposta..." value={risposta} onChange={(e) => setRisposta(e.target.value)}/>
+              <textarea
+                style={styles.input}
+                rows={3}
+                placeholder="Scrivi la risposta..."
+                value={risposta}
+                onChange={(e) => setRisposta(e.target.value)}
+              />
             </div>
+
             <div style={styles.azioniRow}>
               <div style={styles.field}>
                 <label style={styles.label}>Aggiorna stato</label>
-                <select style={{ ...styles.input, width: "auto" }} value={nuovoStato} onChange={(e) => setNuovoStato(e.target.value)}>
+                <select
+                  style={{ ...styles.input, width: "auto" }}
+                  value={nuovoStato}
+                  onChange={(e) => setNuovoStato(e.target.value)}
+                >
                   <option>aperto</option>
                   <option>in lavorazione</option>
                   <option>risolto</option>
@@ -117,11 +144,15 @@ export default function PannelloAdmin() {
               </div>
               <button style={styles.btn} onClick={inviaRisposta}>Invia risposta</button>
             </div>
-            {inviato && <div style={styles.successMsg}>Stato aggiornato. Notifica inviata al cliente.</div>}
+
+            {inviato && (
+              <div style={styles.successMsg}>Stato aggiornato. Notifica inviata al cliente.</div>
+            )}
           </div>
         ) : (
           <div style={styles.vuoto}>Seleziona un ticket dalla lista</div>
         )}
+
       </div>
     </div>
   );
@@ -138,7 +169,7 @@ const styles = {
   listaHeader: { padding: "10px 14px", fontSize: 12, fontWeight: 600, color: "#888", borderBottom: "1px solid #eee", textTransform: "uppercase", letterSpacing: "0.05em" },
   loading: { padding: "20px 14px", fontSize: 13, color: "#aaa" },
   ticketItem: { padding: "12px 14px", borderBottom: "1px solid #f0f0f0", cursor: "pointer" },
-  ticketAttivo: { background: "#FDF0E6", borderLeft: "3px solid #E8610A" },
+  ticketAttivo: { background: "#FDF0E6", borderLeft: `3px solid ${SAMMER_ORANGE}` },
   ticketTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 },
   ticketTitolo: { fontSize: 13, fontWeight: 600, color: "#1a1a1a" },
   statoBadge: { fontSize: 10, padding: "2px 7px", borderRadius: 999, fontWeight: 500 },
@@ -148,15 +179,16 @@ const styles = {
   dettaglio: { padding: "20px", display: "flex", flexDirection: "column", gap: 12, background: "#fff", overflowY: "auto" },
   dettaglioTitolo: { fontSize: 15, fontWeight: 700, color: "#1a1a1a" },
   dettaglioEmail: { fontSize: 12, color: "#888" },
-  dettaglioCategoria: { fontSize: 12, color: "#E8610A", fontWeight: 500 },
+  dettaglioCategoria: { fontSize: 12, color: SAMMER_ORANGE, fontWeight: 500 },
   dettaglioDesc: { fontSize: 13, color: "#555", lineHeight: 1.6 },
   dettaglioData: { fontSize: 11, color: "#bbb" },
   aiBox: { background: "#FDF0E6", border: "1px solid #F4A35A", borderRadius: 8, padding: "10px 12px", fontSize: 12, color: "#7A2E00", lineHeight: 1.6 },
-  aiLabel: { fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, color: "#E8610A" },
+  aiLabel: { fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4, color: SAMMER_ORANGE },
   field: { display: "flex", flexDirection: "column", gap: 4 },
   label: { fontSize: 12, color: "#777", fontWeight: 500 },
   input: { fontSize: 13, padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd", fontFamily: "inherit", color: "#1a1a1a", background: "#fafafa", boxSizing: "border-box", width: "100%" },
   azioniRow: { display: "flex", alignItems: "flex-end", gap: 10 },
-  btn: { padding: "9px 18px", borderRadius: 8, border: "none", background: "#E8610A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
+  btn: { padding: "9px 18px", borderRadius: 8, border: "none", background: SAMMER_ORANGE, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
   successMsg: { fontSize: 12, color: "#166534", background: "#DCFCE7", padding: "8px 12px", borderRadius: 8 },
   vuoto: { display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: 13, background: "#fff" },
+};
