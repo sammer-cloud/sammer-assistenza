@@ -160,4 +160,3 @@ const styles = {
   btn: { padding: "9px 18px", borderRadius: 8, border: "none", background: "#E8610A", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
   successMsg: { fontSize: 12, color: "#166534", background: "#DCFCE7", padding: "8px 12px", borderRadius: 8 },
   vuoto: { display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: 13, background: "#fff" },
-};
