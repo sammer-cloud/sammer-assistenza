@@ -20,14 +20,12 @@ export default function PannelloAdmin() {
 
   useEffect(() => {
     caricaTickets();
-
     const subscription = supabase
       .channel("tickets")
       .on("postgres_changes", { event: "*", schema: "public", table: "tickets" }, () => {
         caricaTickets();
       })
       .subscribe();
-
     return () => supabase.removeChannel(subscription);
   }, []);
 
@@ -49,12 +47,10 @@ export default function PannelloAdmin() {
 
   async function inviaRisposta() {
     if (!risposta.trim() || !selezionato) return;
-
     const { error } = await supabase
       .from("tickets")
       .update({ stato: nuovoStato })
       .eq("id", selezionato.id);
-
     if (!error) {
       setInviato(true);
       setRisposta("");
@@ -72,16 +68,12 @@ export default function PannelloAdmin() {
 
   return (
     <div style={styles.container}>
-
       <div style={styles.header}>
         <span style={styles.logoText}>SAMMER</span>
         <span style={styles.badge}>Pannello operatore</span>
         <span style={styles.counter}>{tickets.length} ticket totali</span>
       </div>
-
       <div style={styles.body}>
-
-        {/* Lista ticket */}
         <div style={styles.lista}>
           <div style={styles.listaHeader}>Ticket</div>
           {loading && <div style={styles.loading}>Caricamento...</div>}
@@ -89,11 +81,7 @@ export default function PannelloAdmin() {
             <div style={styles.loading}>Nessun ticket ancora.</div>
           )}
           {tickets.map((t) => (
-            <div
-              key={t.id}
-              style={{ ...styles.ticketItem, ...(selezionato?.id === t.id ? styles.ticketAttivo : {}) }}
-              onClick={() => seleziona(t)}
-            >
+            <div key={t.id} style={{ ...styles.ticketItem, ...(selezionato?.id === t.id ? styles.ticketAttivo : {}) }} onClick={() => seleziona(t)}>
               <div style={styles.ticketTop}>
                 <span style={styles.ticketTitolo}>#{t.numero}</span>
                 <span style={{ ...styles.statoBadge, ...coloreStato[t.stato] }}>{t.stato}</span>
@@ -105,7 +93,6 @@ export default function PannelloAdmin() {
           ))}
         </div>
 
-        {/* Dettaglio */}
         {selezionato ? (
           <div style={styles.dettaglio}>
             <div style={styles.dettaglioTitolo}>#{selezionato.numero} — {selezionato.nome_cliente}</div>
@@ -115,75 +102,54 @@ export default function PannelloAdmin() {
             <div style={styles.dettaglioData}>Ricevuto il {formatData(selezionato.creato_at)}</div>
 
             {selezionato.allegati && selezionato.allegati.length > 0 && (
-  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-    <div style={{ fontSize: 12, fontWeight: 500, color: "#777" }}>
-      Allegati ({selezionato.allegati.length})
-    </div>
-    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-      {selezionato.allegati.map((percorso, i) => {
-        const url = `https://eshgimmcuacfhjupqkml.supabase.co/storage/v1/object/public/allegati/${percorso}`;
-        const isVideo = percorso.match(/\.(mp4|mov|avi|webm)$/i);
-        return isVideo ? (
-          <video key={i} src={url} controls style={{ maxWidth: 200, borderRadius: 8 }} />
-        ) : (
-          <a key={i} href={url} target="_blank" rel="noreferrer">
-            <img src={url} alt="allegato" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #eee" }} />
-          </a>
-        );
-      })}
-    </div>
-  </div>
-)}
- 
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 500, color: "#777" }}>
+                  Allegati ({selezionato.allegati.length})
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {selezionato.allegati.map((percorso, i) => {
+                    const url = `https://eshgimmcuacfhjupqkml.supabase.co/storage/v1/object/public/allegati/${percorso}`;
+                    const isVideo = percorso.match(/\.(mp4|mov|avi|webm)$/i);
+                    return isVideo ? (
+                      <video key={i} src={url} controls style={{ maxWidth: 200, borderRadius: 8 }} />
+                    ) : (
+                      <a key={i} href={url} target="_blank" rel="noreferrer">
+                        <img src={url} alt="allegato" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #eee" }} />
+                      </a>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div style={styles.aiBox}>
               <div style={styles.aiLabel}>Suggerimento AI</div>
-              Problema comune post-aggiornamento. Suggerisci: hard reset (power + volume giù per 10s). Se non risolve, potrebbe essere necessario un reflash del firmware.
+              Problema comune post-aggiornamento. Suggerisci: hard reset (power + volume giù per 10s).
             </div>
 
             <div style={styles.field}>
-              <label style={styles.label}>Risposta al cliente</label>
-              <textarea
-                style={styles.input}
-                rows={3}
-                placeholder="Scrivi la risposta..."
-                value={risposta}
-                onChange={(e) => setRisposta(e.target.value)}
-              />
-            </div>
-
-            <div style={styles.azioniRow}>
-              <div style={styles.field}>
-                <label style={styles.label}>Aggiorna stato</label>
-                <select
-                  style={{ ...styles.input, width: "auto" }}
-                  value={nuovoStato}
-                  onChange={(e) => setNuovoStato(e.target.value)}
-                >
+              <label style={styles.label}>Aggiorna stato</label>
+              <div style={styles.azioniRow}>
+                <select style={{ ...styles.input, width: "auto" }} value={nuovoStato} onChange={(e) => setNuovoStato(e.target.value)}>
                   <option>aperto</option>
                   <option>in lavorazione</option>
                   <option>risolto</option>
                 </select>
+                <button style={styles.btn} onClick={inviaRisposta}>Aggiorna</button>
               </div>
-              <button style={styles.btn} onClick={inviaRisposta}>Invia risposta</button>
             </div>
 
-            {inviato && (
-              <div style={styles.successMsg}>Stato aggiornato. Notifica inviata al cliente.</div>
-            )}
-            {/* Chat del ticket */}
-<div style={{ marginTop: 8 }}>
-  <div style={{ fontSize: 12, fontWeight: 500, color: "#777", marginBottom: 8 }}>
-    Chat con il cliente
-  </div>
-  <Chat ticketId={selezionato.id} nomeCliente={selezionato.nome_cliente} />
-</div>
+            {inviato && <div style={styles.successMsg}>Stato aggiornato.</div>}
+
+            <div style={{ marginTop: 8, minHeight: 300 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: "#777", marginBottom: 8 }}>Chat con il cliente</div>
+              <Chat ticketId={selezionato.id} nomeCliente={selezionato.nome_cliente} ruolo="operatore" />
+            </div>
 
           </div>
         ) : (
           <div style={styles.vuoto}>Seleziona un ticket dalla lista</div>
         )}
-
       </div>
     </div>
   );
@@ -200,7 +166,7 @@ const styles = {
   listaHeader: { padding: "10px 14px", fontSize: 12, fontWeight: 600, color: "#888", borderBottom: "1px solid #eee", textTransform: "uppercase", letterSpacing: "0.05em" },
   loading: { padding: "20px 14px", fontSize: 13, color: "#aaa" },
   ticketItem: { padding: "12px 14px", borderBottom: "1px solid #f0f0f0", cursor: "pointer" },
-  ticketAttivo: { background: "#FDF0E6", borderLeft: `3px solid ${SAMMER_ORANGE}` },
+  ticketAttivo: { background: "#FDF0E6", borderLeft: "3px solid " + SAMMER_ORANGE },
   ticketTop: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 },
   ticketTitolo: { fontSize: 13, fontWeight: 600, color: "#1a1a1a" },
   statoBadge: { fontSize: 10, padding: "2px 7px", borderRadius: 999, fontWeight: 500 },
@@ -218,7 +184,7 @@ const styles = {
   field: { display: "flex", flexDirection: "column", gap: 4 },
   label: { fontSize: 12, color: "#777", fontWeight: 500 },
   input: { fontSize: 13, padding: "8px 10px", borderRadius: 8, border: "1px solid #ddd", fontFamily: "inherit", color: "#1a1a1a", background: "#fafafa", boxSizing: "border-box", width: "100%" },
-  azioniRow: { display: "flex", alignItems: "flex-end", gap: 10 },
+  azioniRow: { display: "flex", alignItems: "center", gap: 10 },
   btn: { padding: "9px 18px", borderRadius: 8, border: "none", background: SAMMER_ORANGE, color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },
   successMsg: { fontSize: 12, color: "#166534", background: "#DCFCE7", padding: "8px 12px", borderRadius: 8 },
   vuoto: { display: "flex", alignItems: "center", justifyContent: "center", color: "#ccc", fontSize: 13, background: "#fff" },
