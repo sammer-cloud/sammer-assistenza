@@ -47,13 +47,24 @@ export default function NuovoTicket({ onInviato }) {
     return;
   }
 
-  // 2. Carica i file allegati su Storage
-  for (const file of files) {
+  // 2. Carica i file allegati su Storage e salva i percorsi
+const percorsi = [];
+for (const file of files) {
   const estensione = file.name.split(".").pop();
   const percorso = `${ticket.id}/${Date.now()}.${estensione}`;
-  const { data: uploadData, error: uploadError } = await supabase.storage
+  const { error: uploadError } = await supabase.storage
     .from("allegati")
     .upload(percorso, file);
+  if (!uploadError) percorsi.push(percorso);
+}
+
+// 3. Aggiorna il ticket con i percorsi degli allegati
+if (percorsi.length > 0) {
+  const { error: updateError } = await supabase
+    .from("tickets")
+    .update({ allegati: percorsi })
+    .eq("id", ticket.id);
+  console.log("Update allegati:", percorsi, updateError);
 }
 
   setInviato(true);

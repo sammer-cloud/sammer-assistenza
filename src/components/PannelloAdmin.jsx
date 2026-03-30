@@ -114,6 +114,28 @@ export default function PannelloAdmin() {
             <div style={styles.dettaglioDesc}>{selezionato.descrizione}</div>
             <div style={styles.dettaglioData}>Ricevuto il {formatData(selezionato.creato_at)}</div>
 
+            {selezionato.allegati && selezionato.allegati.length > 0 && (
+  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={{ fontSize: 12, fontWeight: 500, color: "#777" }}>
+      Allegati ({selezionato.allegati.length})
+    </div>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      {selezionato.allegati.map((percorso, i) => {
+        const url = `https://eshgimmcuacfhjupqkml.supabase.co/storage/v1/object/public/allegati/${percorso}`;
+        const isVideo = percorso.match(/\.(mp4|mov|avi|webm)$/i);
+        return isVideo ? (
+          <video key={i} src={url} controls style={{ maxWidth: 200, borderRadius: 8 }} />
+        ) : (
+          <a key={i} href={url} target="_blank" rel="noreferrer">
+            <img src={url} alt="allegato" style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 8, border: "1px solid #eee" }} />
+          </a>
+        );
+      })}
+    </div>
+  </div>
+)}
+ 
+
             <div style={styles.aiBox}>
               <div style={styles.aiLabel}>Suggerimento AI</div>
               Problema comune post-aggiornamento. Suggerisci: hard reset (power + volume giù per 10s). Se non risolve, potrebbe essere necessario un reflash del firmware.
