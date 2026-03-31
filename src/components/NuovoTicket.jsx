@@ -26,51 +26,71 @@ export default function NuovoTicket({ onInviato }) {
     setFiles((prev) => [...prev, ...nuovi].slice(0, 3));
   }
 
-   async function handleInvia() {
-  if (!descrizione || !email || !nome) {
-    setErrore("Compila tutti i campi obbligatori.");
-    return;
-  }
-  setLoading(true);
-  setErrore("");
+  async function handleInvia() {
+    if (!descrizione || !email || !nome) {
+      setErrore("Compila tutti i campi obbligatori.");
+      return;
+    }
+    setLoading(true);
+    setErrore("");
 
-  // 1. Crea il ticket nel database
-  const { data: ticket, error: ticketError } = await supabase
-    .from("tickets")
-    .insert([{ nome_cliente: nome, email, categoria, descrizione, stato: "aperto" }])
-    .select()
-    .single();
+    const { data: ticket, error: ticketError } = await supabase
+      .from("tickets")
+      .insert([{ nome_cliente: nome, email, categoria, descrizione, stato: "aperto" }])
+      .select()
+      .single();
 
-  if (ticketError) {
-    setErrore("Errore durante l'invio. Riprova.");
+    if (ticketError) {
+      setErrore("Errore durante l'invio. Riprova.");
+      setLoading(false);
+      return;
+    }
+
+    const percorsi = [];
+    for (const file of files) {
+      const estensione = file.name.split(".").pop();
+      const percorso = `${ticket.id}/${Date.now()}.${estensione}`;
+      const { error: uploadError } = await supabase.storage
+        .from("allegati")
+        .upload(percorso, file);
+      if (!uploadError) percorsi.push(percorso);
+    }
+
+    if (percorsi.length > 0) {
+      await supabase
+        .from("tickets")
+        .update({ allegati: percorsi })
+        .eq("id", ticket.id);
+    }
+
+    await fetch("/api/invia-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        to: email,
+        subject: `Ticket #${ticket.numero} aperto — Sammer Assistenza`,
+        html: `
+          <div style="font-family: system-ui, sans-serif; max-width: 480px; margin: 0 auto; padding: 24px;">
+            <img src="https://sammer-assistenza.vercel.app/icon-512.png" width="80" style="margin-bottom: 16px;" />
+            <h2 style="color: #E8610A;">Abbiamo ricevuto la tua richiesta</h2>
+            <p>Ciao <strong>${nome}</strong>,</p>
+            <p>Il tuo ticket <strong>#${ticket.numero}</strong> è stato aperto con successo.</p>
+            <p><strong>Categoria:</strong> ${categoria}<br/>
+            <strong>Descrizione:</strong> ${descrizione}</p>
+            <p>Un nostro operatore ti risponderà il prima possibile.</p>
+            <a href="https://sammer-assistenza.vercel.app" style="display:inline-block; background:#E8610A; color:#fff; padding:10px 20px; border-radius:8px; text-decoration:none; margin-top:16px;">
+              Vai all'assistenza
+            </a>
+            <p style="color:#888; font-size:12px; margin-top:24px;">Sammer Assistenza Clienti</p>
+          </div>
+        `,
+      }),
+    });
+
+    setInviato(true);
     setLoading(false);
-    return;
+    if (onInviato) onInviato(ticket);
   }
-
-  // 2. Carica i file allegati su Storage e salva i percorsi
-const percorsi = [];
-for (const file of files) {
-  const estensione = file.name.split(".").pop();
-  const percorso = `${ticket.id}/${Date.now()}.${estensione}`;
-  const { error: uploadError } = await supabase.storage
-    .from("allegati")
-    .upload(percorso, file);
-  if (!uploadError) percorsi.push(percorso);
-}
-
-// 3. Aggiorna il ticket con i percorsi degli allegati
-if (percorsi.length > 0) {
-  const { error: updateError } = await supabase
-    .from("tickets")
-    .update({ allegati: percorsi })
-    .eq("id", ticket.id);
-  console.log("Update allegati:", percorsi, updateError);
-}
-
-  setInviato(true);
-  setLoading(false);
-  if (onInviato) onInviato(ticket);
-}
 
   if (inviato) {
     return (
